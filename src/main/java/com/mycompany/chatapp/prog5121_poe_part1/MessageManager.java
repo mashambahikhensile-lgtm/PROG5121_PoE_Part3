@@ -17,6 +17,13 @@ public class MessageManager {
     private Message[] disregardedMessages = new Message[0];
     private Message[] storedMessages = new Message[0];
 
+    // Parallel lookup arrays: matching indexes represent the same message.
+    private String[] messageIDs = new String[0];
+    private String[] messageHashes = new String[0];
+    private String[] messageRecipients = new String[0];
+    private String[] messageTexts = new String[0];
+    private String[] messageStatuses = new String[0];
+
     private final ObjectMapper mapper = new ObjectMapper();
     private final Path storageFile;
 
@@ -44,6 +51,7 @@ public class MessageManager {
         System.out.println("Message storage file: " + this.storageFile);
 
         loadStoredMessages();
+        rebuildParallelArrays();
     }
 
     /**
@@ -108,6 +116,7 @@ public class MessageManager {
             case "sent":
                 message.setFlag("Sent");
                 sentMessages = appendMessage(sentMessages, message);
+                rebuildParallelArrays();
                 return "Message successfully sent.";
 
             case "stored":
@@ -116,11 +125,13 @@ public class MessageManager {
 
                 try {
                     saveStoredMessages();
+                    rebuildParallelArrays();
                     return "Message successfully stored.";
 
                 } catch (IOException exception) {
                     storedMessages = removeMessage(
                             storedMessages, storedMessages.length - 1);
+                    rebuildParallelArrays();
 
                     return "Message could not be stored: "
                             + exception.getMessage();
@@ -131,6 +142,7 @@ public class MessageManager {
                 message.setFlag("Disregard");
                 disregardedMessages = appendMessage(
                         disregardedMessages, message);
+                rebuildParallelArrays();
                 return "Message disregarded.";
 
             default:
@@ -215,6 +227,7 @@ public class MessageManager {
             if (loadedMessages != null) {
                 storedMessages = loadedMessages;
             }
+            rebuildParallelArrays();
 
             System.out.println(
                     "Stored messages loaded successfully: "
@@ -294,31 +307,40 @@ public class MessageManager {
     }
 
     /**
-     * Returns all message hashes from the three message arrays.
+     * Rebuilds parallel lookup arrays in the same order as allMessages().
+     * The same index always refers to the same Message object.
      */
-    public String[] getMessageHashes() {
+    private void rebuildParallelArrays() {
         Message[] messages = allMessages();
-        String[] hashes = new String[messages.length];
+
+        messageIDs = new String[messages.length];
+        messageHashes = new String[messages.length];
+        messageRecipients = new String[messages.length];
+        messageTexts = new String[messages.length];
+        messageStatuses = new String[messages.length];
 
         for (int i = 0; i < messages.length; i++) {
-            hashes[i] = messages[i].getMessageHash();
+            Message message = messages[i];
+            messageIDs[i] = message.getMessageID();
+            messageHashes[i] = message.getMessageHash();
+            messageRecipients[i] = message.getRecipient();
+            messageTexts[i] = message.getMessage();
+            messageStatuses[i] = message.getFlag();
         }
-
-        return hashes;
     }
 
     /**
-     * Returns all message IDs from the three message arrays.
+     * Returns a defensive copy of all message hashes.
+     */
+    public String[] getMessageHashes() {
+        return messageHashes.clone();
+    }
+
+    /**
+     * Returns a defensive copy of all message IDs.
      */
     public String[] getMessageIDs() {
-        Message[] messages = allMessages();
-        String[] ids = new String[messages.length];
-
-        for (int i = 0; i < messages.length; i++) {
-            ids[i] = messages[i].getMessageID();
-        }
-
-        return ids;
+        return messageIDs.clone();
     }
 
     /**
@@ -399,60 +421,40 @@ public class MessageManager {
      * Searches all message arrays using a message ID.
      */
     public String searchByMessageID(String id) {
-
-        Message found = findByID(id);
-
-        if (found == null) {
+        if (id == null) {
             return "No message found with that ID.";
         }
 
-        return "Recipient: " + found.getRecipient()
-                + System.lineSeparator()
-                + "Message: " + found.getMessage();
-    }
-
-    private Message findByID(String id) {
-
-        if (id == null) {
-            return null;
-        }
-
-        for (Message message : allMessages()) {
-
-            if (id.equals(message.getMessageID())) {
-                return message;
+        for (int i = 0; i < messageIDs.length; i++) {
+            if (id.equals(messageIDs[i])) {
+                return "Recipient: " + messageRecipients[i]
+                        + System.lineSeparator()
+                        + "Message: " + messageTexts[i];
             }
         }
 
-        return null;
+        return "No message found with that ID.";
     }
 
     /**
      * Searches sent and stored messages for a particular recipient.
      */
     public String searchStoredByRecipient(String recipient) {
-
         StringBuilder result = new StringBuilder();
 
-        for (Message message : sentMessages) {
-
-            if (message.getRecipient().equals(recipient)) {
-                if (result.length() > 0) {
-                    result.append(System.lineSeparator());
-                }
-
-                result.append(message.getMessage());
-            }
+        if (recipient == null) {
+            return "No sent or stored messages found for that recipient.";
         }
 
-        for (Message message : storedMessages) {
-
-            if (message.getRecipient().equals(recipient)) {
+        // Search the parallel arrays by matching index.
+        for (int i = 0; i < messageRecipients.length; i++) {
+            if (recipient.equals(messageRecipients[i])
+                    && ("Sent".equalsIgnoreCase(messageStatuses[i])
+                    || "Stored".equalsIgnoreCase(messageStatuses[i]))) {
                 if (result.length() > 0) {
                     result.append(System.lineSeparator());
                 }
-
-                result.append(message.getMessage());
+                result.append(messageTexts[i]);
             }
         }
 
@@ -479,6 +481,7 @@ public class MessageManager {
             if (message.getMessageHash().equalsIgnoreCase(hash)) {
 
                 storedMessages = removeMessage(storedMessages, i);
+                rebuildParallelArrays();
 
                 try {
                     saveStoredMessages();
@@ -491,6 +494,7 @@ public class MessageManager {
 
                     storedMessages = insertMessage(
                             storedMessages, message, i);
+                    rebuildParallelArrays();
 
                     return "Message could not be deleted: "
                             + exception.getMessage();

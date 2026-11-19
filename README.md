@@ -1,40 +1,65 @@
-# PROG5121 PoE — Part 2: Sending Messages
+# PROG5121 PoE — Part 3: Store Data and Display Task Report
 
-This project extends the Part 1 QuickChat registration and login application. It is a console-based Java application built in NetBeans with Maven and JUnit 5.
+## Project Overview
+
+This project is the final extension of the QuickChat console application developed for Programming 1A (PROG5121). It is built using Java 17, Maven and JUnit 5.
+
+Part 3 extends the previous application by introducing message collections, JSON persistence, stored-message management, reporting and automated unit testing.
 
 ## Features
-- Registration checks for username, password and South African international cellphone format.
-- Login is allowed only when the registration details pass validation.
-- QuickChat menu with Send Messages, Show recently sent messages, and Quit options.
-- Ten-digit message IDs, message numbering, message hash generation and message detail display.
-- Send, disregard and store message choices.
-- Stored messages are written to `messages.json` in the application's working directory.
-- JUnit tests for IDs, recipient validation, message hashes, message length, send/disregard/store actions and JSON output.
-- GitHub Actions runs the Maven tests on every push and pull request, regardless of feature-branch name.
 
-## Run the project
-Open the folder in NetBeans as a Maven project, then run `PROG5121_PoE_Part1.java`.
+- User registration and login validation.
+- QuickChat console menu and message processing.
+- Ten-digit message ID generation.
+- Message hash generation using the message ID, zero-based message number and message words.
+- Sent, disregarded and stored message collections.
+- JSON persistence of stored messages using Jackson.
+- Loading previously stored messages when the application starts.
+- Displaying the sender and recipient of stored messages.
+- Finding the longest stored message.
+- Searching for a message using its ID.
+- Searching sent and stored messages by recipient.
+- Deleting stored messages using their message hash.
+- Generating a full message report containing message details.
 
-To run tests, use the NetBeans Test action or run `mvn test` from the project folder.
+## Technologies Used
 
-## GitHub feature branch
-Keep `main` as the stable branch. Create a feature branch before making changes, for example:
+- Java 17
+- Apache Maven
+- JUnit 5
+- Jackson Databind 2.17.2
+- NetBeans IDE
+- Git and GitHub
+- GitHub Actions
+
+## Running the Application
+
+1. Open the project in NetBeans as a Maven project.
+2. Ensure that Java 17 is configured.
+3. Run `PROG5121_PoE_Part1.java`.
+4. Follow the console prompts to register and log in.
+5. Use the main menu to send messages or access Stored Messages.
+
+Stored messages are saved in `messages.json` in the application's working directory.
+
+## Running the Unit Tests
+
+Run the following Maven command:
 
 ```bash
-git checkout -b Part2-Message-Feature
+mvn clean test
 ```
 
-Commit and push the feature branch; GitHub Actions will run the tests automatically.
+Alternatively, use the Clean and Build or Test functionality in NetBeans.
 
-## Changelog
-- Extended the Part 1 console application with the QuickChat menu and message-entry loop.
-- Added the `Message` class, message ID generation, message hash creation and message actions.
-- Added JSON message storage.
-- Prevented login when registration validation fails, following Part 1 lecturer feedback.
-- Added tests for message validation, exact example hash, additional hashes in a loop, message actions, JSON output, registration failures and login gating.
-- Corrected message-length test feedback to include the exact number of excess characters.
-- Made the GitHub Actions workflow run for all branches and pull requests.
+The project includes automated tests for registration, login, message processing, message hashes, message collections, JSON persistence, searching, deletion and reporting.
+
+## Automated Testing
+
+GitHub Actions is configured to run the Maven unit tests using Java 17 whenever changes are pushed or pull requests are created.
 
 ## References
-- Stack Overflow, “Validate South Africa cell phone number,” https://stackoverflow.com/questions/4058001/validate-south-africa-cell-phone-number (accessed 17 October 2026).
-- The prescribed Programming 1A module material, PROG5121, Part 2 — Sending Messages, 2026.
+
+- The Independent Institute of Education. (2026). *Programming 1A (PROG5121): Part 3 — Store Data and Display Task Report*. Prescribed assessment material.
+- FasterXML. (2024). *Jackson Databind*. https://github.com/FasterXML/jackson-databind
+- JUnit Team. (2025). *JUnit 5 User Guide*. https://junit.org/junit5/docs/current/user-guide/

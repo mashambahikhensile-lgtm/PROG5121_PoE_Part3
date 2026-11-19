@@ -1,23 +1,21 @@
 
 package com.mycompany.chatapp.prog5121_poe_part1;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Manages QuickChat messages, message arrays and JSON storage.
+ * Manages QuickChat messages using arrays and JSON storage.
  */
 public class MessageManager {
 
-    private final List<Message> sentMessages = new ArrayList<>();
-    private final List<Message> disregardedMessages = new ArrayList<>();
-    private final List<Message> storedMessages = new ArrayList<>();
+    private Message[] sentMessages = new Message[0];
+    private Message[] disregardedMessages = new Message[0];
+    private Message[] storedMessages = new Message[0];
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final Path storageFile;
@@ -33,7 +31,7 @@ public class MessageManager {
     }
 
     /**
-     * Allows a specific JSON file to be supplied, especially for unit tests.
+     * Allows a specific JSON file to be supplied for unit tests.
      */
     public MessageManager(Path storageFile) {
         if (storageFile == null) {
@@ -109,19 +107,20 @@ public class MessageManager {
 
             case "sent":
                 message.setFlag("Sent");
-                sentMessages.add(message);
+                sentMessages = appendMessage(sentMessages, message);
                 return "Message successfully sent.";
 
             case "stored":
                 message.setFlag("Stored");
-                storedMessages.add(message);
+                storedMessages = appendMessage(storedMessages, message);
 
                 try {
                     saveStoredMessages();
                     return "Message successfully stored.";
 
                 } catch (IOException exception) {
-                    storedMessages.remove(message);
+                    storedMessages = removeMessage(
+                            storedMessages, storedMessages.length - 1);
 
                     return "Message could not be stored: "
                             + exception.getMessage();
@@ -130,13 +129,66 @@ public class MessageManager {
             case "disregard":
             case "disregarded":
                 message.setFlag("Disregard");
-                disregardedMessages.add(message);
+                disregardedMessages = appendMessage(
+                        disregardedMessages, message);
                 return "Message disregarded.";
 
             default:
                 return "Unknown message action. "
                         + "Choose Sent, Stored, or Disregard.";
         }
+    }
+
+    /**
+     * Adds a message to the end of an array.
+     */
+    private Message[] appendMessage(Message[] messages, Message message) {
+        Message[] updated = Arrays.copyOf(
+                messages, messages.length + 1);
+
+        updated[updated.length - 1] = message;
+
+        return updated;
+    }
+
+    /**
+     * Removes a message at a specified array index.
+     */
+    private Message[] removeMessage(Message[] messages, int index) {
+        if (index < 0 || index >= messages.length) {
+            return messages;
+        }
+
+        Message[] updated = new Message[messages.length - 1];
+
+        System.arraycopy(messages, 0, updated, 0, index);
+
+        System.arraycopy(
+                messages, index + 1,
+                updated, index,
+                messages.length - index - 1);
+
+        return updated;
+    }
+
+    /**
+     * Inserts a message back into an array at a specified index.
+     */
+    private Message[] insertMessage(
+            Message[] messages, Message message, int index) {
+
+        Message[] updated = new Message[messages.length + 1];
+
+        System.arraycopy(messages, 0, updated, 0, index);
+
+        updated[index] = message;
+
+        System.arraycopy(
+                messages, index,
+                updated, index + 1,
+                messages.length - index);
+
+        return updated;
     }
 
     /**
@@ -149,7 +201,6 @@ public class MessageManager {
                 System.out.println(
                         "No existing messages.json file was found. "
                         + "A new file will be created when a message is stored.");
-
                 return;
             }
 
@@ -158,18 +209,16 @@ public class MessageManager {
                 return;
             }
 
-            List<Message> loadedMessages = mapper.readValue(
-                    storageFile.toFile(),
-                    new TypeReference<List<Message>>() {
-                    });
+            Message[] loadedMessages = mapper.readValue(
+                    storageFile.toFile(), Message[].class);
 
             if (loadedMessages != null) {
-                storedMessages.addAll(loadedMessages);
+                storedMessages = loadedMessages;
             }
 
             System.out.println(
                     "Stored messages loaded successfully: "
-                    + storedMessages.size());
+                    + storedMessages.length);
 
         } catch (IOException exception) {
             System.err.println(
@@ -196,7 +245,7 @@ public class MessageManager {
 
         System.out.println(
                 "Stored messages saved successfully: "
-                + storedMessages.size());
+                + storedMessages.length);
     }
 
     /**
@@ -207,66 +256,76 @@ public class MessageManager {
     }
 
     public Message[] getSentMessages() {
-        return sentMessages.toArray(new Message[0]);
+        return sentMessages.clone();
     }
 
     public Message[] getDisregardedMessages() {
-        return disregardedMessages.toArray(new Message[0]);
+        return disregardedMessages.clone();
     }
 
     public Message[] getStoredMessages() {
-        return storedMessages.toArray(new Message[0]);
+        return storedMessages.clone();
+    }
+
+    /**
+     * Combines all messages into one array.
+     */
+    private Message[] allMessages() {
+        Message[] all = new Message[
+                sentMessages.length
+                + disregardedMessages.length
+                + storedMessages.length];
+
+        int position = 0;
+
+        System.arraycopy(
+                sentMessages, 0, all, position, sentMessages.length);
+        position += sentMessages.length;
+
+        System.arraycopy(
+                disregardedMessages, 0, all, position,
+                disregardedMessages.length);
+        position += disregardedMessages.length;
+
+        System.arraycopy(
+                storedMessages, 0, all, position, storedMessages.length);
+
+        return all;
     }
 
     /**
      * Returns all message hashes from the three message arrays.
      */
     public String[] getMessageHashes() {
+        Message[] messages = allMessages();
+        String[] hashes = new String[messages.length];
 
-        List<String> values = new ArrayList<>();
+        for (int i = 0; i < messages.length; i++) {
+            hashes[i] = messages[i].getMessageHash();
+        }
 
-        addHashes(values, sentMessages);
-        addHashes(values, disregardedMessages);
-        addHashes(values, storedMessages);
-
-        return values.toArray(new String[0]);
+        return hashes;
     }
 
     /**
      * Returns all message IDs from the three message arrays.
      */
     public String[] getMessageIDs() {
+        Message[] messages = allMessages();
+        String[] ids = new String[messages.length];
 
-        List<String> values = new ArrayList<>();
-
-        addIDs(values, sentMessages);
-        addIDs(values, disregardedMessages);
-        addIDs(values, storedMessages);
-
-        return values.toArray(new String[0]);
-    }
-
-    private void addHashes(
-            List<String> result, List<Message> messages) {
-
-        for (Message message : messages) {
-            result.add(message.getMessageHash());
+        for (int i = 0; i < messages.length; i++) {
+            ids[i] = messages[i].getMessageID();
         }
-    }
 
-    private void addIDs(
-            List<String> result, List<Message> messages) {
-
-        for (Message message : messages) {
-            result.add(message.getMessageID());
-        }
+        return ids;
     }
 
     /**
      * Returns the total number of sent messages.
      */
     public int returnTotalMessages() {
-        return sentMessages.size();
+        return sentMessages.length;
     }
 
     public String displaySentMessages() {
@@ -278,22 +337,18 @@ public class MessageManager {
     }
 
     /**
-     * Displays all messages, including sent, disregarded and stored messages.
+     * Displays sent, disregarded and stored messages.
      */
     public String displayReport() {
-
-        List<Message> allMessages = new ArrayList<>();
-
-        allMessages.addAll(sentMessages);
-        allMessages.addAll(disregardedMessages);
-        allMessages.addAll(storedMessages);
-
-        return display(allMessages);
+        return display(allMessages());
     }
 
-    private String display(List<Message> messages) {
+    /**
+     * Formats an array of messages for display.
+     */
+    private String display(Message[] messages) {
 
-        if (messages.isEmpty()) {
+        if (messages.length == 0) {
             return "No messages found.";
         }
 
@@ -358,9 +413,13 @@ public class MessageManager {
 
     private Message findByID(String id) {
 
+        if (id == null) {
+            return null;
+        }
+
         for (Message message : allMessages()) {
 
-            if (message.getMessageID().equals(id)) {
+            if (id.equals(message.getMessageID())) {
                 return message;
             }
         }
@@ -375,15 +434,20 @@ public class MessageManager {
 
         StringBuilder result = new StringBuilder();
 
-        List<Message> searchableMessages = new ArrayList<>();
-
-        searchableMessages.addAll(sentMessages);
-        searchableMessages.addAll(storedMessages);
-
-        for (Message message : searchableMessages) {
+        for (Message message : sentMessages) {
 
             if (message.getRecipient().equals(recipient)) {
+                if (result.length() > 0) {
+                    result.append(System.lineSeparator());
+                }
 
+                result.append(message.getMessage());
+            }
+        }
+
+        for (Message message : storedMessages) {
+
+            if (message.getRecipient().equals(recipient)) {
                 if (result.length() > 0) {
                     result.append(System.lineSeparator());
                 }
@@ -404,24 +468,29 @@ public class MessageManager {
      */
     public String deleteStoredMessageByHash(String hash) {
 
-        for (int i = 0; i < storedMessages.size(); i++) {
+        if (hash == null) {
+            return "No stored message found with that hash.";
+        }
 
-            Message message = storedMessages.get(i);
+        for (int i = 0; i < storedMessages.length; i++) {
+
+            Message message = storedMessages[i];
 
             if (message.getMessageHash().equalsIgnoreCase(hash)) {
 
-                Message removed = storedMessages.remove(i);
+                storedMessages = removeMessage(storedMessages, i);
 
                 try {
                     saveStoredMessages();
 
                     return "Message: \""
-                            + removed.getMessage()
+                            + message.getMessage()
                             + "\" successfully deleted.";
 
                 } catch (IOException exception) {
 
-                    storedMessages.add(i, removed);
+                    storedMessages = insertMessage(
+                            storedMessages, message, i);
 
                     return "Message could not be deleted: "
                             + exception.getMessage();
@@ -430,19 +499,5 @@ public class MessageManager {
         }
 
         return "No stored message found with that hash.";
-    }
-
-    /**
-     * Combines all three arrays for searching and reporting.
-     */
-    private List<Message> allMessages() {
-
-        List<Message> all = new ArrayList<>();
-
-        all.addAll(sentMessages);
-        all.addAll(disregardedMessages);
-        all.addAll(storedMessages);
-
-        return all;
     }
 }
